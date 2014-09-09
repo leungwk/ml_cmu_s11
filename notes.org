@@ -1,0 +1,104 @@
+; -*- mode: org;-*-
+
+* decision tree
+
+It is odd that pruning did not seem to make a difference in testing
+accuracy for bottom-up, while in top-down there was more of an effect.
+As expected, overfitting in top-down did not occur when the tree was
+small (in nodes and in depth).
+
+
+
+# top-down
+expectations (top-down): Larger values of \epsilon, because it leads to
+less pruning, will slow down the pruning of the tree.
+
+observations:
+
+The apparent "tipping" points in \epsilon depend on splitting allowed
+by the information gain in the dataset.
+
+If \epsilon is too large, no pruning occurs. If the training tree was
+perfect on the validation data, and no pruning would be needed, hence it
+would take the longest.
+
+It doesn't take too much time to do a prune that avoids overfitting
+(\epsilon=0.006), due perhaps to the greedy procedure of using the
+largest information gain, which places the most informative nodes at the
+top.
+
+That there are 5 "levels" where accuracy and tree size jumps, would that
+mean 5 features contain most of the information? Or should it be the
+depth of the tree (5 or 7) where overfitting does not occur?
+
+
+
+
+# bottom-up
+Bottom-up takes the same amount of time irregardless of \epsilon?  Such
+timings should have been as expected because it will visit all children
+and inner nodes (roughly), so small \iota changes of \epsilon won't make
+a big difference? Or would smaller \epsilon < 0.001 work?
+
+** pruning and timing
+*** without pruning
+
+data:
+#+BEGIN_EXAMPLE
+In [54]: _ca(mtx_cnt_train), _ca(mtx_cnt_test)
+Out[54]: (1.0, 0.81461352657004826)
+
+In [55]: tree_stats(tree)
+Out[55]: (1153, 11)
+#+END_EXAMPLE
+overfitting
+
+*** top down
+
+data:
+#+BEGIN_EXAMPLE
+    e  cap_train  cap_test     n   d           t
+0.001   0.894107  0.891189    19   5   18.285562
+0.002   0.894107  0.891189    19   5   18.720711
+0.003   0.895879  0.891189    51   7   23.813625
+0.004   0.895879  0.891189    51   7   22.615348
+0.005   0.895879  0.891189    51   7   23.128672
+0.006   0.895879  0.891189    51   7   21.832072
+0.007   0.909615  0.877370   224   8   170.941651
+0.008   0.914931  0.871445   282   8   245.560105
+0.009   0.914931  0.871445   282   8   309.202023
+0.010   0.914931  0.871445   282   8   247.727893
+0.011   0.914931  0.871445   282   8   338.332978
+0.012   0.914931  0.871445   282   8   334.193085
+0.013   0.914931  0.871445   282   8   235.429013
+0.014   0.914931  0.871445   282   8   253.089367
+0.015   0.914931  0.871445   282   8   228.933522
+0.016   0.914931  0.871445   282   8   229.970629
+0.020   0.972087  0.843468   837  11   2370.405390
+0.024   0.972087  0.843468   837  11   2244.040782
+0.028   1.000000  0.814614  1153  11   3653.713521
+0.032   1.000000  0.814614  1153  11   3472.295189
+0.064   1.000000  0.814614  1153  11   3492.725905
+0.160   1.000000  0.814614  1153  11   3623.630783
+#+END_EXAMPLE
+t in seconds. time is for pruning and classification accuracy. runs
+were in done in irregular batches.
+
+*** bottom up
+
+data:
+#+BEGIN_EXAMPLE
+       e  cap_train  cap_test     n   d            t
+0  0.001          1  0.830456  1127  11  5231.415828
+1  0.005          1  0.814614  1153  11  5573.375362
+2  0.010          1  0.814614  1153  11  5194.358681
+3  0.030          1  0.814614  1153  11  5490.615428
+#+END_EXAMPLE
+
+** future
+
+- prune the tree as it is being grown is faster?
+
+** todo
+
+- bottom-up counting issue (see tests/)
