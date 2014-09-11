@@ -116,9 +116,7 @@ _, _, _, _, _ = classification_accuracy(tree6_prune_top, df_samp6, df_samp6_test
 _, _, _, _, _ = classification_accuracy(tree6_prune_bottom, df_samp6, df_samp6_test, attr_target='y')
     # (0,'b','m','y'), # only this changed (1 \to 0)
     # (1,'b','m','y'),
-# TODO: there shouldn't be 100% test accuracy...
-# classification_accuracy() ignores where there is no value? (should it be doing this?, or should it classify irregardless ...)
-# because in the bottom prune, (b,m,*) is missing. It should go per entry in data, and if there are no further children, use the current node. This will handle the case where the tree is not complete over the input space (ie. there is no node for the entire x_1,\dots,x_n sequence), and will allow for only partial sequences.
+# there shouldn't be 100% test accuracy
 
 
 

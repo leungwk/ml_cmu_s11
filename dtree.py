@@ -8,13 +8,14 @@ SEP_SSV=' '
 
 class Node(object):
     """Nodes used to construct the tree. Stores the attribute and value splitted upon (from the parent), and the predicted label"""
-    def __init__(self, children=None, parent=None, data=None, attribute=None, attribute_value=None, label=None):
+    def __init__(self, children=None, parent=None, data=None, attribute=None, attribute_value=None, label=None, valid=True):
         self.children = children if children is not None else []
         self.parent = parent # for going up
         self.data = data
         self.attribute = attribute
         self.attribute_value = attribute_value
         self.label = label
+        self.valid = valid
 
 
 def print_tree(root, attr_target):
@@ -124,7 +125,7 @@ def classification_accuracy(root, df_train_in, df_test_in, attr_target):
         return counts.get('0', counts.get(0, 0)), counts.get('1', counts.get(1, 0))        
 
     def _ca(tree, df_train, df_test, depth):
-        if not tree.children: # is a leaf
+        def _ca_child(tree, df_train, df_test, depth):
             tmp_ser_train_vals = df_train[attr_target].value_counts()
             tmp_ser_test_vals = df_test[attr_target].value_counts()
             label_train, label_test = None, None
@@ -139,11 +140,20 @@ def classification_accuracy(root, df_train_in, df_test_in, attr_target):
 
             return [[tree.label, label_train, label_test, np.array([val_0_train, val_1_train]), np.array([val_0_test, val_1_test])]], [depth, 1]
 
+        if not tree.children: # is a leaf
+            return _ca_child(tree, df_train, df_test, depth)
+
         ## not a leaf
         acc = []
         max_depth = 0
         n_node = 1 # for the inner node
         for child in tree.children:
+            ## note, top-down deletes nodes, so this will always pass.
+            if not child.valid: # was pruned
+                ## calc stats
+                return _ca_child(tree, df_train, df_test, depth)
+
+
             attr = tree.attribute
             attr_val = child.attribute_value
             res, (res_depth, cnt_child) = _ca(child, df_train[df_train[attr] == attr_val], df_test[df_test[attr] == attr_val], depth+1)
@@ -230,17 +240,17 @@ def prune_bottom_up(tree_in, df_train_in, df_valid_in, attr_target, epsilon=0.00
                 ## before
                 _, _, _, _, df_valid_old = classification_accuracy(root, df_train_in, df_valid_in, attr_target)
                 ## after
-                del tree.children[idx]
+                tree.children[idx].valid = False
                 _, _, _, _, df_valid = classification_accuracy(root, df_train_in, df_valid_in, attr_target)
-                
+
                 ac_old, ac = _ca(df_valid_old), _ca(df_valid)
                 acc_stats.append( (ac_old, ac, branch_num, depth) )
                 if ac -ac_old >= epsilon:
                     pass # ie. prune (don't add child back)
                     ## idx now at the next item after `child'
                 else: # add child back
-                    tree.children.insert(idx, child)
-                    idx += 1 # move to the next item
+                    tree.children[idx].valid = True
+                idx += 1 # only if using .valid rather than removing the node
             else: # recur
                 _prune(child, idx, depth+1) # could potentially remove all children of this child
                 idx += 1
