@@ -106,3 +106,15 @@ python dtree.py --train data/hw1/noisy10_train.ssv --test data/hw1/noisy10_test.
 ** todo
 
 - fix n and d counts in bottom-up pruning
+* naive bayes
+** hw qs
+
+q3.1: What if P(X_i|Y) =_{maybe} P(X_j|Y) rather than necessarily?
+#
+For a given label Y, then for a given word X_i, position 1 would need an
+estimated parameter, as will position 2, 3, and so on. For the next
+X_{i+1} (in the known vocabulary), an entirely new set of estimates
+would be required. This means \abs{V} words times the number of word
+positions times m. Removing the word positions simplifies the model for
+tractability, so that one can count just the frequency of a word, per
+category.
