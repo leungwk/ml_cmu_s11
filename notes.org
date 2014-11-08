@@ -108,9 +108,14 @@ python dtree.py --train data/hw1/noisy10_train.ssv --test data/hw1/noisy10_test.
 - fix n and d counts in bottom-up pruning
 
 * naive bayes
-** hw qs
 
-q3.1: What if $P(X_i|Y) =_{\text{maybe}} P(X_j|Y)$ rather than necessarily?
+Caching has been implemented for the training of and classification
+using naive bayes.
+
+** hw qs
+*** q3.1
+
+What if $P(X_i|Y) =_{\text{maybe}} P(X_j|Y)$ rather than necessarily?
 #
 For a given label Y, then for a given word $X_i$, position 1 would need an
 estimated parameter, as will position 2, 3, and so on. For the next
@@ -120,9 +125,10 @@ positions times m. Removing the word positions simplifies the model for
 tractability, so that one can count just the frequency of a word, per
 category.
 
-q3.2
+*** q3.2
+
 #+BEGIN_EXAMPLE
-accuracy: 0.7852098600932712
+test accuracy: 0.7852098600932712
 
 pred   1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17   18   19   20
 base                                                                                                    
@@ -148,13 +154,212 @@ base
 20     39    3    0    0    0    0    0    0    1    1    0    1    0    2    6   27   10    3    7  151
 #+END_EXAMPLE
 
-q3.3: The highest % confusion comes from =talk.*.misc= and =comp.*= (and
+*** q3.3
+
+The highest % confusion comes from =talk.*.misc= and =comp.*= (and
 =sci.electronics=), and the least from =rec.*=
 #
-Under $\alpha = \tfrac{1}{\abs{V}}$, confusion occurs more often when the topic of
-two documents is similar. This is likely due to similar word distributions,
-especially of content words. An addition factor might be the
-inter-related-ness of the underlying phenomenon, or the similar
-interests of users.
+Under $\alpha = \tfrac{1}{\abs{V}}$, confusion occurs more often when
+the topic of two documents is similar. This is likely due to similar
+word distributions, especially of content words. An addition factor
+might be the inter-related-ness of the underlying phenomenon, or the
+similar interests of users.
 
-q3.4: Why does test accuracy drop for small or large \alpha?
+*** q3.4
+
+Why does test accuracy drop for small or large \alpha?
+#
+Small values might not add enough of a pseudo-count to words not seen
+under a given label, which could occur if the number of samples given
+that label is small. Large values add too much to words that would not
+be seen under a given label, such as if the word has nothing to do with
+the topic.
+
+*** q3.5
+
+# (feature selection)
+
+Why does it work?
+#+BEGIN_EXAMPLE
+                   I(X_k)               "H(X_k|Y)"
+         common    small          flat    max
+         occuring  med           modal    med
+         rare      large     one spike    ~0
+#+END_EXAMPLE
+For words that are common and have low "entropy" amongs labels
+("H(X_k|Y)"), the products would be lowest. If it had low "entropy" but
+was a rare word, it should have a larger product. Likewise, if it had
+high "entropy" amongst labels, it should have a larger product compared
+to lower "entropy". (The middle ground is hazy though). Thus the lowest
+product should get the highest score.
+
+Why does using the same form as entropy, but summing over the
+conditions, rather than values, work, when also multiplying by the info
+content of X_k?
+#
+Compare H(X|Y) vs. H(X|y); the latter is by definition (replace p(x)
+with p(x|y)), and the former is a weighted average wrt p(y) over all
+possible y.
+#
+$H(X|y) = -\sum_x p(x|y) \log_2 p(x|y)$ and
+\[
+    H(X|Y) = \sum_y p(y) H(X|Y=y) = \sum_y p(y) [-\sum_x p(x|y) \log_2 p(x|y)] = ...
+\]
+so for p(x|y) (= P(X=x|Y=y); =p_x_given_y_tab=),
+$-\sum_y p(x|y) \log_2 p(x|y) = \sum_y p(x|y) I(x|y)$,
+where I(x|y) is the conditional self-information.
+
+Should this be H(X=x|Y) because the average is across the condition? 
+If one selected a particular value of X in H(X|Y), then
+\begin{align*}
+H(X=x|Y)
+&= \sum_y p(y) H(X=x|Y=y)\\
+&= \sum_y p(y) [-\sum_{x';x=x'} p(x'|y) \log_2 p(x'|y)]\\
+&= \sum_y p(y) [- p(x|y) \log_2 p(x|y) ]\\
+&= \sum_y p(y)p(x|y) I(x|y)\\
+&= \sum_y p(x,y) I(x|y)
+\end{align*}
+This differs from =entropy(pow10(p_x_given_y_tab))=
+where p(x,y) is replaced by p(x|y).
+If it is a kind of entropy, then that times I(X;X) follows the measure.
+
+
+Could it be that p(x) or I(X_k) is like a weight, averaging "H(X_k|Y)"?,
+resulting in something like $H(Y|X_k)$, where one wants the least
+"entropy".
+\[
+    [-\log_2 p(x)][-\sum_{y \in Y} p(x|y) \log_2 p(x|y)] = -\sum_{y \in Y} I(X_k)p(x|y) \log_2 p(x|y)
+\]
+#
+or rather 
+\[
+    [-\sum_{y \in Y} p(x|y) \log_2 p(x|y)] =_? E_{p(x|Y)}[I(x|Y)]
+\]
+and so it times I(X_k) gives the info content of x times the expected
+amount of info of x?
+
+Why is X_k important if the product is small?
+If word X_k is common, info content is low, and if it only occurs within
+one class (highly peaked), then the expected amount of info is also low.
+
+How does this relate to naive bayes? If $p(x|Y_k)$ for a particular
+class Y_k is higher relative to all other classes (ie. the "entropy" is
+low), and the word is common, then it would be more likely to classify
+as Y_k. (The word needs to be common enough to confirm it is from Y_k).
+
+*** q3.7
+
+top 100 by the metric
+#+begin_example
+           metric             word   log_p_x
+id_word                                     
+35304    0.000361              nhl -3.910684
+52308    0.000475   stephanopoulos -4.118061
+35211    0.000632            leafs -4.141930
+33446    0.000820           alomar -4.258040
+27489    0.000871        wolverine -4.309539
+37640    0.000881           crypto -4.276928
+35267    0.000981          lemieux -4.324860
+23810    0.000988            oname -4.330285
+37629    0.001029              rsa -4.342078
+37624    0.001042            ripem -4.347128
+45949    0.001045            athos -4.345241
+33514    0.001076              rbi -4.371599
+47919    0.001092          firearm -4.402432
+21870    0.001178        powerbook -4.428339
+33375    0.001238          pitcher -4.430304
+41476    0.001265             dyer -4.431956
+35226    0.001274           bruins -4.434004
+21813    0.001307            lciii -4.471805
+35261    0.001316          lindros -4.447507
+23812    0.001374          fprintf -4.468188
+35608    0.001376              ahl -4.466189
+49365    0.001386       azerbaijan -4.484103
+42662    0.001412          candida -4.478156
+21755    0.001467             iisi -4.520109
+23694    0.001499             args -4.504782
+33454    0.001504           baerga -4.511777
+35197    0.001552          gilmour -4.516745
+40341    0.001561             gfci -4.530441
+46034    0.001564              clh -4.513778
+33382    0.001582         pitchers -4.532966
+36229    0.001635           gainey -4.538739
+33461    0.001638          clemens -4.547689
+33570    0.001638          dodgers -4.547689
+28014    0.001668          liefeld -4.581604
+27983    0.001668       sabretooth -4.581604
+35269    0.001680             jagr -4.550169
+17638    0.001691              rlk -4.580324
+21774    0.001709              adb -4.584227
+27980    0.001726        hobgoblin -4.595845
+35706    0.001728            hawks -4.561907
+37724    0.001762        anonymity -4.567286
+37634    0.001762            crypt -4.567286
+19704    0.001780             aspi -4.589331
+31471    0.001807  countersteering -4.588953
+27776    0.001853         punisher -4.625808
+23923    0.001856            xfree -4.594591
+49528    0.001869      azerbaijani -4.609909
+37650    0.001936           cipher -4.606995
+35262    0.001948           recchi -4.612316
+49253    0.001967             sdpa -4.631272
+35531    0.001979       soderstrom -4.619050
+35238    0.001979           oilers -4.619050
+33995    0.001991              obp -4.629876
+23737    0.001995           libxmu -4.624973
+49313    0.002001            argic -4.638633
+35475    0.002012           goalie -4.625889
+33358    0.002035           inning -4.639019
+49312    0.002037           serdar -4.646121
+3911     0.002038           jaeger -4.717211
+49712    0.002056          sumgait -4.649914
+24366    0.002057              xmu -4.637748
+17660    0.002164              umu -4.684220
+49537    0.002174             gaza -4.673395
+37851    0.002174          denning -4.655843
+23699    0.002191            ioccc -4.664482
+23639    0.002228       obfuscated -4.671430
+10999    0.002237         rayshade -4.687065
+44674    0.002241            nsmca -4.673157
+23959    0.002265              xdm -4.678492
+35399    0.002271           dineen -4.677041
+31217    0.002275            ranck -4.685862
+24068    0.002304              dpy -4.685671
+23813    0.002304           stderr -4.685671
+33567    0.002342        cardinals -4.698333
+47907    0.002408        homicides -4.734718
+44060    0.002443          orbiter -4.709673
+35216    0.002451           potvin -4.709226
+33779    0.002466         sandberg -4.720052
+24245    0.002474            imake -4.715634
+37657    0.002477        plaintext -4.710890
+28134    0.002492          uccxkvb -4.750745
+3302     0.002496         mozumder -4.802923
+36042    0.002501          moncton -4.717659
+35241    0.002501          whalers -4.717659
+25310    0.002568        mydisplay -4.731428
+34407    0.002603              wip -4.742915
+43259    0.002612           hicnet -4.736987
+37800    0.002623         bontchev -4.735024
+49369    0.002652             baku -4.757428
+49367    0.002652         karabakh -4.757428
+35256    0.002662          messier -4.743988
+35282    0.002662             bure -4.743988
+35250    0.002662        canadiens -4.743988
+52113    0.002680           steveh -4.842964
+31250    0.002689           bikers -4.756443
+37628    0.002702    cryptographic -4.747613
+44350    0.002739             ssto -4.757978
+28005    0.002762            keown -4.794211
+27492    0.002762          mutants -4.794211
+31567    0.002772          infante -4.769407
+#+end_example
+
+The words look semantically related to each other, but this is to be
+expected in future data sets. The question is whether the frequency of
+usage would change, and would the semantic relatedness change.
+
+The problem of "dataset bias" would be compounded by estimates with
+large variation. This is unlikely as a join with their marginalized
+probability P(X_k) suggests these are common words, relative to the
+average probability of words.

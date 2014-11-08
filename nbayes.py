@@ -3,7 +3,45 @@ import numpy as np
 
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
+from scipy.stats import entropy
 
+from functools import wraps
+import zlib
+import cPickle as pickle
+import os
+
+data_dir = 'data/hw2/'
+cache_dir = 'cache/'
+
+def _cache(func):
+    def _outer_func(func):
+        @wraps(func)
+        # def inner_func(*args, **kwargs):
+        def _inner_func(*args):
+            ## construct total hash
+            hashes = []
+            for arg in args:
+                h = getattr(arg, '_cpickle_p2_crc32', None)
+                if h is None: # calc now, but don't store
+                    h = zlib.crc32(pickle.dumps(arg, protocol=2)) # much faster than protocol=0
+                hashes.append(str(h))
+            ## rather than one big cache (dict), write per resultant crc32. It should have less overhead. Conceptually it would separate each (input,f) to its own file
+            ## not using zodb (one big file, and would still need to un-pickle on each call) nor pytables (too hard to install)
+            the_hash = str(zlib.crc32(''.join([func.__name__] +hashes)))
+            cache_path = cache_dir +the_hash
+            if os.path.isfile(cache_path):
+                with open(cache_path, 'rb+') as f_cache:
+                    res = pickle.load(f_cache)
+            else:
+                res = func(*args)
+                with open(cache_path, 'wb+') as f_cache:
+                    pickle.dump(res, f_cache, protocol=2)
+            return res
+        return _inner_func
+    return _outer_func(func)
+
+
+@_cache
 def train_naive_bayes(df_train_data, df_train_labels, df_vocab, df_ng_labels, alpha):
     """"""
 
@@ -45,6 +83,7 @@ def train_naive_bayes(df_train_data, df_train_labels, df_vocab, df_ng_labels, al
     return p_y, p_x_given_y_tab
 
 
+@_cache
 def classify(df_test_data, df_test_labels, p_x_given_y_tab, p_y):
     acc_base_pred = []
     for doc in sorted(set(df_test_data.index.get_level_values('doc'))):
@@ -65,12 +104,16 @@ def classify(df_test_data, df_test_labels, p_x_given_y_tab, p_y):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('--train-data', help='input file', default='data/hw2/train.data')
-    parser.add_argument('--train-label', help='input file', default='data/hw2/train.label')
-    parser.add_argument('--test-data', help='input file', default='data/hw2/test.data')
-    parser.add_argument('--test-label', help='input file', default='data/hw2/test.label')
-    parser.add_argument('--vocabulary', help='input file', default='data/hw2/vocabulary.txt')
-    parser.add_argument('--newsgrouplabels', help='input file', default='data/hw2/newsgrouplabels.txt')
+    parser.add_argument('--train-data', help='input file', default=data_dir +'input/train.data')
+    parser.add_argument('--train-label', help='input file', default=data_dir +'input/train.label')
+    parser.add_argument('--test-data', help='input file', default=data_dir +'input/test.data')
+    parser.add_argument('--test-label', help='input file', default=data_dir +'input/test.label')
+    parser.add_argument('--vocabulary', help='input file', default=data_dir +'input/vocabulary.txt')
+    parser.add_argument('--newsgrouplabels', help='input file', default=data_dir +'input/newsgrouplabels.txt')
+
+    parser.add_argument('--plot', dest='plot', action='store_true')
+    parser.set_defaults(plot=False)
+
     args = parser.parse_args()
 
     ## read input
@@ -112,6 +155,10 @@ if __name__ == '__main__':
     df_confuse.index = df_ng_labels.index.copy()
     df_confuse.index.name = 'base'
 
+    pd.set_option('display.width', None)
+    print "test accuracy: {}".format(accuracy)
+    print df_confuse
+
     ## number of times base was confused for something else
     tmp_df = df_test_labels['id_lab'].value_counts().to_frame()
     tmp_df.columns = ['cnt_base']
@@ -119,6 +166,10 @@ if __name__ == '__main__':
     tmp_df_2.columns = ['cnt_confuse']
     df_cnt_confuse = tmp_df_2.join(df_ng_labels).join(tmp_df)
     df_cnt_confuse['p_confuse'] = 1.*df_cnt_confuse['cnt_confuse']/df_cnt_confuse['cnt_base']
+
+    ## memoize (by checksum) is faster than re-calculating each time, but as most of the lookup is spent in pickling (if using protocol=0 for cPickle, but even if protocol=2), instead pre-calculate the checksum for the dataframe, and assume it won't be mutated
+    for df in [df_train_data, df_train_labels, df_vocab, df_ng_labels, df_test_data, df_test_labels]:
+        setattr(df, '_cpickle_p2_crc32', zlib.crc32(pickle.dumps(df, protocol=2)))
 
     ## various alphas
     size_vocab = len(df_vocab)
@@ -135,17 +186,38 @@ if __name__ == '__main__':
     print accuracy_list
     df_alphas = pd.DataFrame(zip(alphas, accuracy_list), columns=['alpha','acc'])
 
-    plt.close()
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.plot(alphas, accuracy_list, '-', alphas, accuracy_list, 'o', color='k') # line with data points
-    ax.set_xscale('log')
-    ax.set_xlabel(r'$\alpha$')
-    ax.set_ylabel('test accuracy (%)')
-    ax.set_title('Effect of different Dirichlet priors on test accuracy')
-    ## format for less visual cluster
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
-    plt.savefig('img/hw2_-_alpha,test_accuracy.png', format='png')
-    # plt.show()
+    if args.plot:
+        plt.close()
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        ax.plot(alphas, accuracy_list, '-', alphas, accuracy_list, 'o', color='k') # line with data points
+        ax.set_xscale('log')
+        ax.set_xlabel(r'$\alpha$')
+        ax.set_ylabel('test accuracy (%)')
+        ax.set_title('Effect of different Dirichlet priors on test accuracy for naive bayes document classification')
+        ## format for less visual cluster
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.get_xaxis().tick_bottom()
+        ax.get_yaxis().tick_left()
+        plt.savefig('img/hw2_-_alpha,test_accuracy.png', format='png')
+        # plt.show()
+
+
+
+    ## feature selection
+    size_vocab = len(df_vocab)
+    alpha = 1./size_vocab
+    p_y, p_x_given_y_tab = train_naive_bayes(df_train_data, df_train_labels, df_vocab, df_ng_labels, alpha)
+    ## calc p(x) = \sum_y p(x,y) = \sum_y p(x|y)p(y)
+    p_xy = np.power(10, p_x_given_y_tab).mul(p_y['p'])
+    p_x = p_xy.sum(axis=1)
+
+    i_x = -1.*np.log2(p_x) # information content of a particular word (not an ensemble) (aka. self-information)
+
+    h_x_given_Y = np.power(10, p_x_given_y_tab).apply(lambda r: entropy(r, base=2), axis=1) # note that H(X|Y=y) = \sum_{x \in X} p(x|y) \log_2 p(x|y), but I did \sum_{y \in Y} p(x|y) \log_2 p(x|y), summing over the condition (labels) rather than summing over possible outcomes (words)
+
+    ## why does "*" work? see notes
+    tmp_df_res = (i_x * h_x_given_Y).to_frame(name='metric').join(df_vocab).sort('metric', ascending=True).join(np.log10(p_x).to_frame('log_p_x'))
+    ## print out the top 100 words
+    pd.set_option('display.max_rows', None)
+    print tmp_df_res.iloc[:100]
