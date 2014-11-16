@@ -1,1 +1,1 @@
-Code for programming assignments in Machine Learning by Tom Mitchell (10-701/15-781, Spring 2011).
+Code and notes for (programming) assignments in Machine Learning by Tom Mitchell (10-701/15-781, Spring 2011).
