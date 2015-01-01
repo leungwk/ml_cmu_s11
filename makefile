@@ -30,3 +30,12 @@ hw3_test:
 
 demos_dominos:
 	python -m demos.dominos
+
+
+hw3_logreg: hw3_logreg_calc hw3_logreg_plot
+
+hw3_logreg_calc:
+	python logreg.py --calc
+
+hw3_logreg_plot:
+	python logreg.py --plot

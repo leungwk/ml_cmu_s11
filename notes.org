@@ -2,6 +2,9 @@
 
 * decision tree
 
+For classifying a mushroom as poisonous or not over 22 features.
+
+** results
 It is odd that pruning did not seem to make a difference in testing
 accuracy for bottom-up, while in top-down there was more of an effect.
 As expected, overfitting in top-down did not occur when the tree was
@@ -40,7 +43,7 @@ cannot, so it will evaluate more nodes because it removes them one by
 one. Smaller \epsilon values does lead to faster pruning times, because
 more is pruned.
 
-** pruning and timing
+** pruning and timing data
 *** without pruning
 
 data:
@@ -108,6 +111,8 @@ python dtree.py --train data/hw1/noisy10_train.ssv --test data/hw1/noisy10_test.
 - fix n and d counts in bottom-up pruning
 
 * naive bayes
+
+For document classification over 20 newsgroups.
 
 Caching has been implemented for the training of and classification
 using naive bayes.
@@ -473,3 +478,24 @@ information than knowing X_1, because going from X_1 downto X_n is
 affected by the probability (uncertainty) \epsilon, while going from X_n
 upto X_1, all the intermediate states are given (ie. had to have
 occured)?
+* multi-class logistic regression
+
+For handwritten digit recognition of the USPS digit dataset.
+Uses 6000 labelled training examples of a 16x16 image unrolled, and 5000 test examples.
+
+** summary of results
+
+(see also the image of these results by number of iterations)
+#+begin_example
+max_iter=200, delta_obj=0.001, eta=0.0001
+            ll     tr     te    n
+lda                              
+0     -788.871  0.919  0.886  199
+1     -823.485  0.920  0.886  199
+10   -1101.917  0.922  0.892  199
+100  -2625.249  0.906  0.882   96
+1000 -6886.912  0.848  0.829   22
+#+end_example
+Some regularization can help improve performance and generalization.
+Too much regularization can introduce bias into the result by reducing
+sensitivity at the weight updates.
